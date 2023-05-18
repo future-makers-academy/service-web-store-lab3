@@ -3,8 +3,6 @@ const express = require('express');
 const multer = require('multer');
 const bodyParser = require("body-parser");
 const app = express();
-const bcrypt = require('bcrypt');
-const crypto = require('crypto');
 const cors = require('cors');
 var fs = require('fs');
 
@@ -49,24 +47,6 @@ const storage = multer.diskStorage({
     },
   });
 
-  const session = require('express-session');
-  const PgSession = require('connect-pg-simple')(session);
-
-    const sessionOptions = {
-        secret: 'your-secret-key',
-        resave: false,
-        saveUninitialized: false,
-        store: new PgSession({              
-        pool: dbclient,
-        tableName: 'session',
-        }),
-        cookie: {
-        secure: false, // Set to true if using HTTPS
-        maxAge: 1000 * 60 * 60 * 24,
-        },
-    };
-    
-    app.use(session(sessionOptions));
     app.use('/images', express.static('images'));
 
     app.listen(8080, ()=>{
@@ -76,19 +56,6 @@ const storage = multer.diskStorage({
 
 
 dbclient.connect()
-
-
-const requireLogin = (req, res, next) => {
-    if (!req.session.userId) {
-      return res.redirect('/login');
-    }
-    next();
-  };
-
-
-app.get('/', (req, res)=>{
-    res.send("blah");
-})
 
 app.get('/products', (req, res)=>{
     dbclient.query(`Select * from products`, (err, result)=>{
@@ -115,13 +82,13 @@ app.post('/product', requireLogin, upload.single('image'), (req, res)=>{
                 name
                 , description
                 , price
-                , image_path
+                
             )
             VALUES(
                 '${req.body.name}'
                 ,'${req.body.description}'
                 ,${req.body.price}
-                ,'${req.protocol+"://"+req.headers.host+"/images/"+req.file.filename}'
+                
             )
             RETURNING *`, (err, result)=>{
             if(!err){
@@ -134,7 +101,7 @@ app.post('/product', requireLogin, upload.single('image'), (req, res)=>{
     dbclient.end;
 })
 
-app.get('/product/:id', requireLogin, (req, res)=>{
+app.get('/product/:id',  (req, res)=>{
     let id = req.params.id;
     dbclient.query(`SELECT * FROM products WHERE id = ${id}`, (err, result)=>{
         if(!err){
@@ -144,7 +111,7 @@ app.get('/product/:id', requireLogin, (req, res)=>{
     dbclient.end;
 })
 
-app.put('/product/:id', requireLogin, (req, res)=>{    
+app.put('/product/:id',  (req, res)=>{    
     let name = req.body.name;
     let price = req.body.price;
     let image = req.body.image;
@@ -153,7 +120,7 @@ app.put('/product/:id', requireLogin, (req, res)=>{
     dbclient.query(
         `UPDATE products
          SET name = '${name}', price = ${price}, 
-         image = '${req.protocol+"://"+req.headers.host+"/images/"+image}', description = '${description}'
+         description = '${description}'
          WHERE id = ${id}`,
         (err, result)=>{
             if(!err){
@@ -166,7 +133,7 @@ app.put('/product/:id', requireLogin, (req, res)=>{
     dbclient.end;
 })
 
-app.delete('/product/:id', requireLogin, (req, res)=>{
+app.delete('/product/:id',  (req, res)=>{
     let id = req.params.id;
     dbclient.query(`DELETE from PRODUCTS where id = ${id}`, (err, result)=>{
         if(!err){
@@ -178,34 +145,6 @@ app.delete('/product/:id', requireLogin, (req, res)=>{
     });
     dbclient.end;
 })
-
-app.get('/testproductadd', (req, res)=>{
-    
-    res.sendFile(__dirname + '/productPOSTtest.html');
-})
-
-app.get('/testproductget', (req, res)=>{
-    
-    
-
-    dbclient.query(`Select * from products`, (err, result)=>{
-        if(!err){            
-            var html = "<html>";
-
-            result.rows.forEach(row => {
-
-                html += `<p>RECORD: ${row.id} | Name: ${row.name} | Description: ${row.description}  | Image: <img src='images/${row.image_path}'> |</p><br>`;
-            });
-
-            html += "</html>";
-            
-            res.send(html);
-        }
-    });
-    dbclient.end;    
-})
-
-
 
 app.get('/cart', (req, res)=>{
      dbclient.query(`Select * from cart_items WHERE user_id = ${req.session.userId}`, (err, result)=>{
